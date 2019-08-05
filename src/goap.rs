@@ -3,7 +3,7 @@ use std::hash::Hash;
 use std::fmt::Debug;
 
 bitflags! {
-    struct StateFlag: u32 {
+    pub struct StateFlag: u32 {
         const NONE = 0;
         const HAS_AXE = 0b00000001;
         const HAS_WOOD = 0b00000010;
@@ -40,15 +40,18 @@ trait Action: Debug {
     fn preconditions(&self) -> StateFlag;
     fn effects(&self) -> StateFlag;
     fn cost(&self) -> i32;
+    fn exec(&self, ch: &mut crate::Char, _state: &mut crate::MainState) {
+        println!("EXEC ch {:?} action {:?}", ch, self);
+    }
 }
 
 #[derive(Default, Debug)]
 struct ChopWood;
-
 impl Action for ChopWood {
     fn preconditions(&self) -> StateFlag { StateFlag::HAS_AXE }
     fn effects(&self) -> StateFlag { StateFlag::HAS_WOOD }
     fn cost(&self) -> i32 { 4 }
+    fn exec(&self, ch: &mut crate::Char, state: &mut crate::MainState) {}
 }
 
 #[derive(Default, Debug)]
@@ -134,7 +137,7 @@ fn name() {
 
     let start = Context::with_state(StateFlag::AXE_AVAILABLE);
     let target = Context::with_state(StateFlag::HAS_WOOD);
-     Planner::find_path(&start, &target, &[&chop, &collect, &get_axe]);
+    Planner::find_path(&start, &target, &[&chop, &collect, &get_axe]);
     // ctx.items.insert(Item::Axe, 1);
 
     // let hasAxe = Has(Item::Axe);
