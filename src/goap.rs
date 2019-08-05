@@ -73,18 +73,18 @@ struct Planner {
 }
 
 struct Step<'a> {
-    next: Option<Rc<Step<'a>>>,
-    action: &'a dyn Action,
+    state: StateFlag,
+    action: Option<&'a dyn Action>,
 }
 
-impl<'a> Step<'a> {
-    pub fn new(action: &'a dyn Action) -> Self {
-        Self {
-            action,
-            next: None,
-        }
-    }
-}
+// impl<'a> Step<'a> {
+//     pub fn new(action: &'a dyn Action) -> Self {
+//         Self {
+//             state: state,
+//             action: Some(action),
+//         }
+//     }
+// }
 
 impl Planner {
     pub fn find_actions_to(ctx: &Context, actions: &[&Action]) {
@@ -95,21 +95,25 @@ impl Planner {
         }
 
     }
-    fn predecessors(n: &Context, actions: &[&Action]) -> Vec<(Context, i32)> {
+    fn predecessors<'a>(n: &Context, actions: &[&'a Action]) -> Vec<(Step<'a>, i32)> {
         let mut v = Vec::with_capacity(actions.len());
         for a in actions {
             if n.would_be_reached_by(*a) {
                 println!("state {:?} contains action {:?} state {:?}", n.state, a, a.effects());
                 let step_ctx = (n.state - a.effects()) | a.preconditions();
                 println!("  step state {:?}", step_ctx);
-                v.push((Context::with_state(step_ctx), a.cost()));
+                v.push((Step { state = step_ctx, action = Some(a) }, a.cost()));
             }
         }
         v
     }
     pub fn find_path(start: &Context, end: &Context, actions: &[&Action]) {
         use pathfinding::directed::dijkstra;
-        let path = dijkstra::dijkstra(end, |n| Self::predecessors(n, actions), |n| n == start);
+        let endStep = Step {
+            action: None,
+            state: end.state,
+        };
+        let path = dijkstra::dijkstra(end, |n| Self::predecessors(n, actions), |n| n.state == start.state);
         println!("Path {:?}", path);
     //     use std::collections::{
     //         vec_deque::VecDeque,
