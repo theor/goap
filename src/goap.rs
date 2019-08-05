@@ -1,5 +1,5 @@
-use std::rc::Rc;
-use std::collections::HashMap;
+use std::hash::Hasher;
+use std::hash::Hash;
 use std::fmt::Debug;
 
 bitflags! {
@@ -67,67 +67,58 @@ impl Action for GetAxe {
     fn cost(&self) -> i32 { 2 }
 }
 
-#[derive(Debug)]
-struct Planner {
 
-}
-
+#[derive(Clone, Debug)]
 struct Step<'a> {
-    state: StateFlag,
+    state: Context,
     action: Option<&'a dyn Action>,
 }
 
-// impl<'a> Step<'a> {
-//     pub fn new(action: &'a dyn Action) -> Self {
-//         Self {
-//             state: state,
-//             action: Some(action),
-//         }
-//     }
-// }
+impl<'a> PartialEq for Step<'a> {
+    fn eq(&self, other: &Self) -> bool {
+        self.state == other.state
+    }
+}
+
+impl<'a> Eq for Step<'a> {}
+
+impl<'a> Hash for Step<'a> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.state.hash(state);
+    }
+}
+
+struct Planner;
 
 impl Planner {
-    pub fn find_actions_to(ctx: &Context, actions: &[&Action]) {
-        for a in actions {
-            if ctx.would_be_reached_by(*a) {
-                println!("state {:?} contains action {:?} state {:?}", ctx.state, a, a.effects());
-            }
-        }
-
-    }
-    fn predecessors<'a>(n: &Context, actions: &[&'a Action]) -> Vec<(Step<'a>, i32)> {
+    fn predecessors<'a>(n: &Step<'a>, actions: &[&'a Action]) -> Vec<(Step<'a>, i32)> {
         let mut v = Vec::with_capacity(actions.len());
         for a in actions {
-            if n.would_be_reached_by(*a) {
+            if n.state.would_be_reached_by(*a) {
                 println!("state {:?} contains action {:?} state {:?}", n.state, a, a.effects());
-                let step_ctx = (n.state - a.effects()) | a.preconditions();
+                let step_ctx = (n.state.state - a.effects()) | a.preconditions();
                 println!("  step state {:?}", step_ctx);
-                v.push((Step { state = step_ctx, action = Some(a) }, a.cost()));
+                v.push((Step { state: Context::with_state(step_ctx), action: Some(*a) }, a.cost()));
             }
         }
         v
     }
     pub fn find_path(start: &Context, end: &Context, actions: &[&Action]) {
         use pathfinding::directed::dijkstra;
-        let endStep = Step {
+        let end_step = Step {
             action: None,
-            state: end.state,
+            state: end.clone(),
         };
-        let path = dijkstra::dijkstra(end, |n| Self::predecessors(n, actions), |n| n.state == start.state);
-        println!("Path {:?}", path);
-    //     use std::collections::{
-    //         vec_deque::VecDeque,
-    //         HashMap,
-    //     };
-    //     // let queue = VecDeque::new();
+        let path = dijkstra::dijkstra(&end_step, |n| Self::predecessors(n, actions), |n| &n.state == start);
+        if let Some(path) = path {
+            println!("Path: {} steps, cost {}", path.0.len(), path.1);
 
-    //     // let map = HashMap::new();
+            for step in path.0.iter().rev() {
+            println!("  {:?}", step);
 
-    //     // queue.push_back(end);
-    //     // while let Some(u) = queue.pop_front() {
+            }
 
-    //     // }
-
+        }
     }
 }
 
@@ -135,16 +126,15 @@ impl Planner {
 fn name() {
     use std::default::Default;
 
-    let mut ctx:Context = Context::new();
+    // let ctx:Context = Context::new();
 
     let chop: ChopWood = Default::default();
     let collect: CollectBranches = Default::default();
-    let getAxe: GetAxe = Default::default();
+    let get_axe: GetAxe = Default::default();
 
-    let start = Context::with_state(StateFlag::NONE);
+    let start = Context::with_state(StateFlag::AXE_AVAILABLE);
     let target = Context::with_state(StateFlag::HAS_WOOD);
-     Planner::find_actions_to(&target, &[&chop, &collect, &getAxe]);
-     Planner::find_path(&start, &target, &[&chop, &collect, &getAxe]);
+     Planner::find_path(&start, &target, &[&chop, &collect, &get_axe]);
     // ctx.items.insert(Item::Axe, 1);
 
     // let hasAxe = Has(Item::Axe);
